@@ -15,6 +15,14 @@ let answered = false;
 
 const BASE_MIDI = 60;
 
+// 🔊 MASTER
+const master = new Tone.Volume(-6).toDestination();
+
+// 🔥 SINT ÚNICO GLOBAL (resolve o estouro)
+const synth = new Tone.Synth({
+  volume: 0
+}).connect(master);
+
 // ===== INTERVALOS =====
 const intervals = [
   { name: "segunda menor", value: 1 },
@@ -56,7 +64,7 @@ function setLevel(l) {
   nextExercise();
 }
 
-// ===== PAD (WORSHIP SOUND) =====
+// ===== PAD =====
 async function startPad() {
   await Tone.start();
   stopPad();
@@ -68,9 +76,7 @@ async function startPad() {
   });
 
   pad = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      type: "sine"
-    },
+    oscillator: { type: "sine" },
     envelope: {
       attack: 1.2,
       decay: 0.3,
@@ -79,7 +85,7 @@ async function startPad() {
     }
   });
 
-  pad.chain(chorus, reverb, Tone.Destination);
+  pad.chain(chorus, reverb, master);
 
   pad.triggerAttack([
     Tone.Frequency(tonicMidi, "midi"),
@@ -104,8 +110,6 @@ function togglePad() {
 async function playListen() {
   await Tone.start();
 
-  const synth = new Tone.Synth().toDestination();
-
   if (mode === "interval") {
     synth.triggerAttackRelease(
       Tone.Frequency(tonicMidi + currentInterval.value, "midi"),
@@ -126,8 +130,6 @@ async function playListen() {
 // ===== RESPOSTA =====
 async function playAnswer(semi) {
   await Tone.start();
-
-  const synth = new Tone.Synth().toDestination();
 
   synth.triggerAttackRelease(
     Tone.Frequency(tonicMidi + semi, "midi"),
@@ -182,15 +184,16 @@ function selectAnswer(el, value) {
   selectedAnswer = value;
 }
 
-// ===== SONS =====
+// ===== FEEDBACK =====
 function playCorrectSound() {
-  const synth = new Tone.Synth().toDestination();
   synth.triggerAttackRelease("C5", "8n");
-  setTimeout(() => synth.triggerAttackRelease("E5", "8n"), 120);
+
+  setTimeout(() => {
+    synth.triggerAttackRelease("E5", "8n");
+  }, 120);
 }
 
 function playErrorSound() {
-  const synth = new Tone.Synth().toDestination();
   synth.triggerAttackRelease("C3", "8n");
 }
 
@@ -306,5 +309,4 @@ function nextExercise() {
   createAnswers();
 }
 
-// START
 setLevel("easy");
