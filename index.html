@@ -10,19 +10,24 @@
 
 <div class="container">
 
-  <!-- LOGO + TÍTULO -->
   <div class="logo-area">
     <img src="logo.png" alt="Ei Teclas" class="logo">
     <h1>Treino de Ouvido</h1>
     <p class="subtitle">Desenvolva sua percepção musical</p>
   </div>
 
-  <!-- CARD PRINCIPAL -->
+  <!-- 🔥 NÍVEIS -->
+  <div class="level-controls">
+    <button id="btn-easy" onclick="setLevel('easy')">Fácil</button>
+    <button id="btn-medium" onclick="setLevel('medium')">Médio</button>
+    <button id="btn-hard" onclick="setLevel('hard')">Difícil</button>
+  </div>
+
   <div class="card">
 
     <div class="controls">
-      <button onclick="togglePad()">PAD</button>
-      <button onclick="playInterval()">OUVIR</button>
+      <button id="padBtn" onclick="togglePad()">PAD</button>
+      <button onclick="playListen()">OUVIR</button>
       <button onclick="nextExercise()">PRÓXIMO</button>
     </div>
 
@@ -36,7 +41,6 @@
 
   </div>
 
-  <!-- RODAPÉ -->
   <div class="footer">
     Desenvolvido por <strong>Jonatas Carvalho</strong><br>
     Curso O Som Das Teclas<br>
