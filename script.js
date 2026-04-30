@@ -1,140 +1,112 @@
-let pad = null;
-let tonicMidi;
-let currentInterval;
+// ===== CONFIG =====
 let selectedAnswer = null;
+let currentInterval = null;
+let score = 0;
 
-const BASE_MIDI = 60;
+// ===== AUDIO =====
+const synth = new Tone.Synth().toDestination();
 
-// 🔥 LISTA COMPLETA DE INTERVALOS
+// ===== INTERVALOS (ajuste conforme seu original se tiver mais) =====
 const intervals = [
-  { name: "segunda menor", value: 1 },
-  { name: "segunda maior", value: 2 },
-  { name: "terça menor", value: 3 },
-  { name: "terça maior", value: 4 },
-  { name: "quarta justa", value: 5 },
-  { name: "quarta aumentada", value: 6 },
-  { name: "quinta justa", value: 7 },
-  { name: "sexta menor", value: 8 },
-  { name: "sexta maior", value: 9 },
-  { name: "sétima menor", value: 10 },
-  { name: "sétima maior", value: 11 },
-  { name: "oitava", value: 12 }
+  { name: "Uníssono", value: 0 },
+  { name: "Segunda menor", value: 1 },
+  { name: "Segunda maior", value: 2 },
+  { name: "Terça menor", value: 3 },
+  { name: "Terça maior", value: 4 },
+  { name: "Quarta justa", value: 5 },
+  { name: "Quinta justa", value: 7 },
+  { name: "Sexta maior", value: 9 },
+  { name: "Sétima maior", value: 11 },
+  { name: "Oitava", value: 12 }
 ];
 
-// ===== UTIL =====
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
+// ===== GERAR EXERCÍCIO =====
+function nextExercise() {
+  selectedAnswer = null;
+  document.getElementById("feedback").innerText = "";
+
+  currentInterval = intervals[Math.floor(Math.random() * intervals.length)];
+
+  document.getElementById("question").innerText = "Ouça e identifique o intervalo";
+
+  renderAnswers();
 }
 
-// ===== PAD =====
-function startPad() {
-  stopPad();
-
-  pad = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "sine" }
-  }).toDestination();
-
-  pad.triggerAttack([
-    Tone.Frequency(tonicMidi, "midi"),
-    Tone.Frequency(tonicMidi + 7, "midi")
-  ]);
-}
-
-function stopPad() {
-  if (pad) {
-    pad.releaseAll();
-    pad.dispose();
-    pad = null;
-  }
-}
-
-function togglePad() {
-  pad ? stopPad() : startPad();
-}
-
-// ===== PLAY INTERVALO =====
+// ===== TOCAR INTERVALO =====
 function playInterval() {
-  const synth = new Tone.Synth({
-    oscillator: { type: "triangle" }
-  }).toDestination();
+  if (!currentInterval) return;
 
-  synth.triggerAttackRelease(
-    Tone.Frequency(tonicMidi + currentInterval.value, "midi"),
-    "1n"
-  );
+  const root = "C4";
+  const note = Tone.Frequency(root).transpose(currentInterval.value).toNote();
+
+  synth.triggerAttackRelease(root, "8n");
+  setTimeout(() => {
+    synth.triggerAttackRelease(note, "8n");
+  }, 300);
 }
 
-// ===== TOCAR RESPOSTA =====
-function playAnswer(semitones) {
-  const synth = new Tone.Synth({
-    oscillator: { type: "triangle" }
-  }).toDestination();
-
-  synth.triggerAttackRelease(
-    Tone.Frequency(tonicMidi + semitones, "midi"),
-    "1n"
-  );
-}
-
-// ===== ANSWERS =====
-function createAnswers() {
+// ===== RENDER RESPOSTAS =====
+function renderAnswers() {
   const container = document.getElementById("answers");
   container.innerHTML = "";
 
-  let options = [...Array(12).keys()].map(n => n + 1);
-  shuffle(options);
-
-  options.forEach(semi => {
+  intervals.forEach((interval) => {
     const div = document.createElement("div");
     div.className = "answer";
+    div.innerText = interval.name;
 
     div.onclick = () => {
-      playAnswer(semi);        // 🔊 TOCA A NOTA
-      selectAnswer(div, semi); // seleciona
+      selectedAnswer = interval.value;
+
+      document.querySelectorAll(".answer").forEach(el => el.classList.remove("selected"));
+      div.classList.add("selected");
     };
 
     container.appendChild(div);
   });
 }
 
-function selectAnswer(el, value) {
-  document
-    .querySelectorAll(".answer")
-    .forEach(a => a.classList.remove("selected"));
-
-  el.classList.add("selected");
-  selectedAnswer = value;
-}
-
-// ===== CONFIRM =====
+// ===== CONFIRMAR RESPOSTA =====
 function confirmAnswer() {
-  if (!selectedAnswer) return;
+  if (selectedAnswer === null) return;
 
   const feedback = document.getElementById("feedback");
 
-  feedback.innerText =
-    selectedAnswer === currentInterval.value
-      ? "Correto!"
-      : "Não é esse.";
+  if (selectedAnswer === currentInterval.value) {
+    score++;
+
+    feedback.innerText = `✓ Excelente! Acertos seguidos: ${score}`;
+    feedback.className = "correct";
+
+    // SOM DE ACERTO
+    synth.triggerAttackRelease("C5", "8n");
+    setTimeout(() => synth.triggerAttackRelease("E5", "8n"), 120);
+
+  } else {
+    score = 0;
+
+    feedback.innerText = "✕ Errou... sequência reiniciada.";
+    feedback.className = "incorrect";
+
+    // SOM DE ERRO
+    synth.triggerAttackRelease("C3", "8n");
+  }
 }
 
-// ===== NEXT =====
-function nextExercise() {
-  stopPad();
-  selectedAnswer = null;
-  document.getElementById("feedback").innerText = "";
+// ===== PAD (opcional simples) =====
+let padOn = false;
+let pad;
 
-  tonicMidi = BASE_MIDI + Math.floor(Math.random() * 12);
-  currentInterval = intervals[Math.floor(Math.random() * intervals.length)];
-
-  document.getElementById("question").innerText =
-    `Ache a ${currentInterval.name}`;
-
-  createAnswers();
+function togglePad() {
+  if (!padOn) {
+    pad = new Tone.Synth().toDestination();
+    pad.triggerAttack("C3");
+    padOn = true;
+  } else {
+    pad.triggerRelease();
+    padOn = false;
+  }
 }
 
-// START
+// ===== INICIAR =====
 nextExercise();
