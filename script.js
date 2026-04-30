@@ -1,5 +1,3 @@
-
-let pad = null;
 let padSynth = null;
 
 let tonicMidi;
@@ -19,20 +17,20 @@ let answered = false;
 const BASE_MIDI = 60;
 
 // =====================
-// 🔥 MASTER AUDIO FIX
+// 🔥 MASTER FIX (volume equilibrado)
 // =====================
 
-const limiter = new Tone.Limiter(-3).toDestination();
-const master = new Tone.Volume(-8).connect(limiter);
+const limiter = new Tone.Limiter(-1).toDestination();
+const master = new Tone.Volume(-2).connect(limiter);
 
-// 🎹 UM ÚNICO SYNTH GLOBAL (CORREÇÃO PRINCIPAL)
+// 🎹 ÚNICO SYNTH GLOBAL (evita overload)
 const synth = new Tone.Synth({
-  oscillator: { type: "sine" },
+  oscillator: { type: "triangle" }, // mais cheio que sine
   envelope: {
     attack: 0.01,
     decay: 0.2,
-    sustain: 0.3,
-    release: 0.8
+    sustain: 0.4,
+    release: 0.6
   }
 }).connect(master);
 
@@ -84,7 +82,7 @@ function setLevel(l) {
 }
 
 // =====================
-// PAD (ESTABILIZADO)
+// PAD (ESTÁVEL + LIMPO)
 // =====================
 
 async function startPad() {
@@ -92,10 +90,10 @@ async function startPad() {
   stopPad();
 
   padSynth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "sine" },
+    oscillator: { type: "triangle" },
     envelope: {
-      attack: 1.2,
-      decay: 0.3,
+      attack: 1.5,
+      decay: 0.4,
       sustain: 0.9,
       release: 3
     },
@@ -103,7 +101,7 @@ async function startPad() {
   }).connect(master);
 
   const chorus = new Tone.Chorus(2, 2.5, 0.3).start();
-  const reverb = new Tone.Reverb({ decay: 5, wet: 0.4 });
+  const reverb = new Tone.Reverb({ decay: 6, wet: 0.4 });
 
   padSynth.chain(chorus, reverb, master);
 
@@ -127,7 +125,7 @@ function togglePad() {
 }
 
 // =====================
-// OUVIR (SEM NOVOS SYNTHS)
+// OUVIR (VOLUME CORRIGIDO)
 // =====================
 
 async function playListen() {
@@ -136,14 +134,18 @@ async function playListen() {
   if (mode === "interval") {
     synth.triggerAttackRelease(
       Tone.Frequency(tonicMidi + currentInterval.value, "midi"),
-      "8n"
+      "8n",
+      undefined,
+      1
     );
   } else {
     sequence.forEach((note, i) => {
       setTimeout(() => {
         synth.triggerAttackRelease(
           Tone.Frequency(note, "midi"),
-          "8n"
+          "8n",
+          undefined,
+          1
         );
       }, i * 300);
     });
@@ -151,7 +153,7 @@ async function playListen() {
 }
 
 // =====================
-// RESPOSTAS (SEM NOVO SYNTH)
+// RESPOSTA (AGORA AUDÍVEL)
 // =====================
 
 async function playAnswer(semi) {
@@ -159,24 +161,85 @@ async function playAnswer(semi) {
 
   synth.triggerAttackRelease(
     Tone.Frequency(tonicMidi + semi, "midi"),
-    "8n"
+    "8n",
+    undefined,
+    1
   );
 }
 
 // =====================
-// FEEDBACK SONORO
+// SONS DE FEEDBACK (AGORA DESTACADOS)
 // =====================
 
 function playCorrectSound() {
-  synth.triggerAttackRelease("C5", "8n");
+  synth.triggerAttackRelease("C5", "8n", undefined, 1);
+  setTimeout(() => {
+    synth.triggerAttackRelease("E5", "8n", undefined, 1);
+  }, 120);
 }
 
 function playErrorSound() {
-  synth.triggerAttackRelease("C3", "8n");
+  synth.triggerAttackRelease("C3", "8n", undefined, 1);
 }
 
 // =====================
-// RESTO DO JOGO (SEM MUDANÇA DE LÓGICA)
+// CONFIRM
+// =====================
+
+async function confirmAnswer() {
+  if (selectedAnswer === null || answered) return;
+
+  await Tone.start();
+  answered = true;
+
+  const feedback = document.getElementById("feedback");
+
+  const correct =
+    mode === "interval"
+      ? currentInterval.value
+      : targetNote;
+
+  const isCorrect = (selectedAnswer % 12) === (correct % 12);
+
+  if (isCorrect) {
+    score++;
+    feedback.innerText = `✔ Acertou! | Acertos: ${score} | Erros: ${errors}`;
+    playCorrectSound();
+  } else {
+    errors++;
+    feedback.innerText = `✖ Errou! | Acertos: ${score} | Erros: ${errors}`;
+    playErrorSound();
+  }
+}
+
+// =====================
+// NEXT (SEM ALTERAÇÃO LOGICA)
+// =====================
+
+function nextExercise() {
+  stopPad();
+  selectedAnswer = null;
+  answered = false;
+
+  document.getElementById("feedback").innerText = "";
+
+  tonicMidi = BASE_MIDI + rand(12);
+
+  const padBtn = document.getElementById("padBtn");
+
+  mode = "interval";
+  currentInterval = intervals[rand(intervals.length)];
+
+  padBtn.style.display = "block";
+
+  document.getElementById("question").innerText =
+    `Ache a ${currentInterval.name}`;
+
+  createAnswers();
+}
+
+// =====================
+// RESPOSTAS
 // =====================
 
 function createAnswers() {
@@ -222,60 +285,7 @@ function selectAnswer(el, value) {
 }
 
 // =====================
-// CONFIRM
-// =====================
-
-async function confirmAnswer() {
-  if (selectedAnswer === null || answered) return;
-
-  await Tone.start();
-  answered = true;
-
-  const feedback = document.getElementById("feedback");
-
-  const correct =
-    mode === "interval"
-      ? currentInterval.value
-      : targetNote;
-
-  const isCorrect = (selectedAnswer % 12) === (correct % 12);
-
-  if (isCorrect) {
-    score++;
-    feedback.innerText = `✔ Acertou!`;
-    playCorrectSound();
-  } else {
-    errors++;
-    feedback.innerText = `✖ Errou!`;
-    playErrorSound();
-  }
-}
-
-// =====================
-// NEXT (IGUAL AO SEU)
-// =====================
-
-function nextExercise() {
-  stopPad();
-  selectedAnswer = null;
-  answered = false;
-
-  document.getElementById("feedback").innerText = "";
-
-  tonicMidi = BASE_MIDI + rand(12);
-
-  const padBtn = document.getElementById("padBtn");
-
-  mode = "interval";
-  currentInterval = intervals[rand(intervals.length)];
-
-  padBtn.style.display = "block";
-
-  document.getElementById("question").innerText =
-    `Ache a ${currentInterval.name}`;
-
-  createAnswers();
-}
-
 // START
+// =====================
+
 setLevel("easy");
