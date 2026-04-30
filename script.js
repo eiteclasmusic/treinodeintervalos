@@ -29,7 +29,7 @@ const intervals = [
   { name: "sétima menor", value: 10 },
   { name: "sétima maior", value: 11 },
   { name: "oitava", value: 12 }
-};
+];
 
 // ===== UTIL =====
 function rand(max) {
@@ -56,31 +56,30 @@ function setLevel(l) {
   nextExercise();
 }
 
-// ===== PAD MELHORADO (WORSHIP) =====
+// ===== PAD (WORSHIP SOUND) =====
 async function startPad() {
   await Tone.start();
   stopPad();
 
+  const chorus = new Tone.Chorus(2, 2.5, 0.4).start();
   const reverb = new Tone.Reverb({
     decay: 6,
     wet: 0.5
-  }).toDestination();
-
-  const chorus = new Tone.Chorus(2, 2.5, 0.3).start();
+  });
 
   pad = new Tone.PolySynth(Tone.Synth, {
     oscillator: {
       type: "sine"
     },
     envelope: {
-      attack: 1.5,
+      attack: 1.2,
       decay: 0.3,
       sustain: 0.9,
       release: 3
     }
   });
 
-  pad.chain(chorus, reverb);
+  pad.chain(chorus, reverb, Tone.Destination);
 
   pad.triggerAttack([
     Tone.Frequency(tonicMidi, "midi"),
@@ -101,19 +100,11 @@ function togglePad() {
   pad ? stopPad() : startPad();
 }
 
-// ===== OUVIR (MELODIA MELHORADA) =====
+// ===== OUVIR =====
 async function playListen() {
   await Tone.start();
 
-  const synth = new Tone.Synth({
-    oscillator: { type: "sine" },
-    envelope: {
-      attack: 0.05,
-      decay: 0.2,
-      sustain: 0.5,
-      release: 1
-    }
-  }).toDestination();
+  const synth = new Tone.Synth().toDestination();
 
   if (mode === "interval") {
     synth.triggerAttackRelease(
@@ -127,24 +118,16 @@ async function playListen() {
           Tone.Frequency(note, "midi"),
           "8n"
         );
-      }, i * 350);
+      }, i * 300);
     });
   }
 }
 
-// ===== RESPOSTA (SOM MAIS LIMPO) =====
+// ===== RESPOSTA =====
 async function playAnswer(semi) {
   await Tone.start();
 
-  const synth = new Tone.Synth({
-    oscillator: { type: "sine" },
-    envelope: {
-      attack: 0.01,
-      decay: 0.2,
-      sustain: 0.3,
-      release: 0.8
-    }
-  }).toDestination();
+  const synth = new Tone.Synth().toDestination();
 
   synth.triggerAttackRelease(
     Tone.Frequency(tonicMidi + semi, "midi"),
