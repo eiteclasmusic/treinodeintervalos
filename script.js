@@ -56,12 +56,30 @@ function setLevel(l) {
   nextExercise();
 }
 
-// ===== PAD =====
+// ===== PAD (WORSHIP SOUND) =====
 async function startPad() {
   await Tone.start();
   stopPad();
 
-  pad = new Tone.PolySynth(Tone.Synth).toDestination();
+  const chorus = new Tone.Chorus(2, 2.5, 0.4).start();
+  const reverb = new Tone.Reverb({
+    decay: 6,
+    wet: 0.5
+  });
+
+  pad = new Tone.PolySynth(Tone.Synth, {
+    oscillator: {
+      type: "sine"
+    },
+    envelope: {
+      attack: 1.2,
+      decay: 0.3,
+      sustain: 0.9,
+      release: 3
+    }
+  });
+
+  pad.chain(chorus, reverb, Tone.Destination);
 
   pad.triggerAttack([
     Tone.Frequency(tonicMidi, "midi"),
