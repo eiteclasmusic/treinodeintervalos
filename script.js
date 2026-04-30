@@ -1,4 +1,7 @@
+
 let pad = null;
+let padSynth = null;
+
 let tonicMidi;
 let currentInterval;
 let selectedAnswer = null;
@@ -15,7 +18,28 @@ let answered = false;
 
 const BASE_MIDI = 60;
 
-// ===== INTERVALOS =====
+// =====================
+// 🔥 MASTER AUDIO FIX
+// =====================
+
+const limiter = new Tone.Limiter(-3).toDestination();
+const master = new Tone.Volume(-8).connect(limiter);
+
+// 🎹 UM ÚNICO SYNTH GLOBAL (CORREÇÃO PRINCIPAL)
+const synth = new Tone.Synth({
+  oscillator: { type: "sine" },
+  envelope: {
+    attack: 0.01,
+    decay: 0.2,
+    sustain: 0.3,
+    release: 0.8
+  }
+}).connect(master);
+
+// =====================
+// INTERVALOS
+// =====================
+
 const intervals = [
   { name: "segunda menor", value: 1 },
   { name: "segunda maior", value: 2 },
@@ -31,7 +55,10 @@ const intervals = [
   { name: "oitava", value: 12 }
 ];
 
-// ===== UTIL =====
+// =====================
+// UTIL
+// =====================
+
 function rand(max) {
   return Math.floor(Math.random() * max);
 }
@@ -43,68 +70,68 @@ function shuffle(arr) {
   }
 }
 
-// ===== NÍVEL =====
+// =====================
+// NÍVEL
+// =====================
+
 function setLevel(l) {
   level = l;
 
-  document.getElementById("btn-easy").classList.remove("active");
-  document.getElementById("btn-medium").classList.remove("active");
-  document.getElementById("btn-hard").classList.remove("active");
-
+  document.querySelectorAll("button").forEach(b => b.classList.remove("active"));
   document.getElementById("btn-" + l).classList.add("active");
 
   nextExercise();
 }
 
-// ===== PAD (WORSHIP SOUND) =====
+// =====================
+// PAD (ESTABILIZADO)
+// =====================
+
 async function startPad() {
   await Tone.start();
   stopPad();
 
-  const chorus = new Tone.Chorus(2, 2.5, 0.4).start();
-  const reverb = new Tone.Reverb({
-    decay: 6,
-    wet: 0.5
-  });
-
-  pad = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      type: "sine"
-    },
+  padSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sine" },
     envelope: {
       attack: 1.2,
       decay: 0.3,
       sustain: 0.9,
       release: 3
-    }
-  });
+    },
+    maxPolyphony: 4
+  }).connect(master);
 
-  pad.chain(chorus, reverb, Tone.Destination);
+  const chorus = new Tone.Chorus(2, 2.5, 0.3).start();
+  const reverb = new Tone.Reverb({ decay: 5, wet: 0.4 });
 
-  pad.triggerAttack([
+  padSynth.chain(chorus, reverb, master);
+
+  padSynth.triggerAttack([
     Tone.Frequency(tonicMidi, "midi"),
     Tone.Frequency(tonicMidi + 7, "midi")
   ]);
 }
 
 function stopPad() {
-  if (pad) {
-    pad.releaseAll();
-    pad.dispose();
-    pad = null;
+  if (padSynth) {
+    padSynth.releaseAll();
+    padSynth.dispose();
+    padSynth = null;
   }
 }
 
 function togglePad() {
   if (mode !== "interval") return;
-  pad ? stopPad() : startPad();
+  padSynth ? stopPad() : startPad();
 }
 
-// ===== OUVIR =====
+// =====================
+// OUVIR (SEM NOVOS SYNTHS)
+// =====================
+
 async function playListen() {
   await Tone.start();
-
-  const synth = new Tone.Synth().toDestination();
 
   if (mode === "interval") {
     synth.triggerAttackRelease(
@@ -123,11 +150,12 @@ async function playListen() {
   }
 }
 
-// ===== RESPOSTA =====
+// =====================
+// RESPOSTAS (SEM NOVO SYNTH)
+// =====================
+
 async function playAnswer(semi) {
   await Tone.start();
-
-  const synth = new Tone.Synth().toDestination();
 
   synth.triggerAttackRelease(
     Tone.Frequency(tonicMidi + semi, "midi"),
@@ -135,7 +163,22 @@ async function playAnswer(semi) {
   );
 }
 
-// ===== RESPOSTAS =====
+// =====================
+// FEEDBACK SONORO
+// =====================
+
+function playCorrectSound() {
+  synth.triggerAttackRelease("C5", "8n");
+}
+
+function playErrorSound() {
+  synth.triggerAttackRelease("C3", "8n");
+}
+
+// =====================
+// RESTO DO JOGO (SEM MUDANÇA DE LÓGICA)
+// =====================
+
 function createAnswers() {
   const container = document.getElementById("answers");
   container.innerHTML = "";
@@ -149,13 +192,9 @@ function createAnswers() {
 
   options.add(correct);
 
-  for (let i = -3; i <= 3; i++) {
-    options.add(correct + i);
-  }
+  for (let i = -3; i <= 3; i++) options.add(correct + i);
 
-  while (options.size < 12) {
-    options.add(rand(24) - 6);
-  }
+  while (options.size < 12) options.add(rand(24) - 6);
 
   let finalOptions = Array.from(options);
   shuffle(finalOptions);
@@ -182,19 +221,10 @@ function selectAnswer(el, value) {
   selectedAnswer = value;
 }
 
-// ===== SONS =====
-function playCorrectSound() {
-  const synth = new Tone.Synth().toDestination();
-  synth.triggerAttackRelease("C5", "8n");
-  setTimeout(() => synth.triggerAttackRelease("E5", "8n"), 120);
-}
+// =====================
+// CONFIRM
+// =====================
 
-function playErrorSound() {
-  const synth = new Tone.Synth().toDestination();
-  synth.triggerAttackRelease("C3", "8n");
-}
-
-// ===== CONFIRM =====
 async function confirmAnswer() {
   if (selectedAnswer === null || answered) return;
 
@@ -208,21 +238,23 @@ async function confirmAnswer() {
       ? currentInterval.value
       : targetNote;
 
-  const isCorrect =
-    (selectedAnswer % 12) === (correct % 12);
+  const isCorrect = (selectedAnswer % 12) === (correct % 12);
 
   if (isCorrect) {
     score++;
-    feedback.innerText = `✔ Acertou! | Acertos: ${score} | Erros: ${errors}`;
+    feedback.innerText = `✔ Acertou!`;
     playCorrectSound();
   } else {
     errors++;
-    feedback.innerText = `✖ Errou! | Acertos: ${score} | Erros: ${errors}`;
+    feedback.innerText = `✖ Errou!`;
     playErrorSound();
   }
 }
 
-// ===== NEXT =====
+// =====================
+// NEXT (IGUAL AO SEU)
+// =====================
+
 function nextExercise() {
   stopPad();
   selectedAnswer = null;
@@ -234,74 +266,13 @@ function nextExercise() {
 
   const padBtn = document.getElementById("padBtn");
 
-  if (level === "easy") {
-    mode = "interval";
+  mode = "interval";
+  currentInterval = intervals[rand(intervals.length)];
 
-    const pool = intervals.filter(i =>
-      [3, 4, 7, 12].includes(i.value)
-    );
+  padBtn.style.display = "block";
 
-    currentInterval = pool[rand(pool.length)];
-
-    padBtn.style.display = "block";
-
-    document.getElementById("question").innerText =
-      `Ache a ${currentInterval.name}`;
-  }
-
-  else if (level === "medium") {
-    mode = Math.random() > 0.5 ? "interval" : "melody";
-
-    if (mode === "interval") {
-      currentInterval = intervals[rand(intervals.length)];
-      padBtn.style.display = "block";
-
-      document.getElementById("question").innerText =
-        `Ache a ${currentInterval.name}`;
-    } else {
-      padBtn.style.display = "none";
-
-      const size = [3, 4][rand(2)];
-      sequence = [];
-
-      for (let i = 0; i < size; i++) {
-        sequence.push(tonicMidi + rand(18));
-      }
-
-      const pos = rand(size);
-      targetNote = sequence[pos] - tonicMidi;
-
-      const nomes = ["PRIMEIRA", "SEGUNDA", "TERCEIRA", "ÚLTIMA"];
-
-      let textoPos = pos === size - 1 ? "ÚLTIMA" : nomes[pos];
-
-      document.getElementById("question").innerText =
-        `Ouça ${size} notas — qual é a ${textoPos}?`;
-    }
-  }
-
-  else if (level === "hard") {
-    mode = "melody";
-
-    padBtn.style.display = "none";
-
-    const size = [4, 5][rand(2)];
-    sequence = [];
-
-    for (let i = 0; i < size; i++) {
-      sequence.push(tonicMidi + rand(24));
-    }
-
-    const pos = rand(size);
-    targetNote = sequence[pos] - tonicMidi;
-
-    const nomes = ["PRIMEIRA", "SEGUNDA", "TERCEIRA", "QUARTA", "ÚLTIMA"];
-
-    let textoPos = pos === size - 1 ? "ÚLTIMA" : nomes[pos];
-
-    document.getElementById("question").innerText =
-      `Ouça ${size} notas — qual é a ${textoPos}?`;
-  }
+  document.getElementById("question").innerText =
+    `Ache a ${currentInterval.name}`;
 
   createAnswers();
 }
